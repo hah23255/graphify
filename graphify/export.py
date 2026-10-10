@@ -1085,6 +1085,17 @@ def to_obsidian(
     return node_notes_written + community_notes_written
 
 
+def to_okf(
+    G: nx.Graph,
+    communities: dict[int, list[str]],
+    output_dir: str,
+    community_labels: dict[int, str] | None = None,
+    cohesion: dict[int, float] | None = None,
+) -> int:
+    from graphify.exporters.okf import to_okf as _to_okf
+    return _to_okf(G, communities, output_dir, community_labels, cohesion)
+
+
 def to_canvas(
     G: nx.Graph,
     communities: dict[int, list[str]],

@@ -2945,12 +2945,13 @@ def dispatch_command(cmd: str) -> None:
 
     elif cmd == "export":
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
-        if subcmd not in ("html", "callflow-html", "obsidian", "wiki", "svg", "graphml", "neo4j", "falkordb"):
+        if subcmd not in ("html", "callflow-html", "obsidian", "okf", "wiki", "svg", "graphml", "neo4j", "falkordb"):
             print("Usage: graphify export <format>", file=sys.stderr)
             print("  html      [--graph PATH] [--labels PATH] [--node-limit N] [--no-viz]", file=sys.stderr)
             print("  callflow-html [GRAPH|DIR] [--graph PATH] [--labels PATH] [--report PATH] [--sections PATH] [--output HTML]", file=sys.stderr)
             print("            [--lang auto|zh-CN|en] [--max-sections N] [--diagram-scale N]", file=sys.stderr)
             print("  obsidian  [--graph PATH] [--labels PATH] [--dir PATH]", file=sys.stderr)
+            print("  okf       [--graph PATH] [--labels PATH] [--dir PATH]", file=sys.stderr)
             print("  wiki      [--graph PATH] [--labels PATH]", file=sys.stderr)
             print("  svg       [--graph PATH] [--labels PATH]", file=sys.stderr)
             print("  graphml   [--graph PATH]", file=sys.stderr)
@@ -2979,6 +2980,7 @@ def dispatch_command(cmd: str) -> None:
         node_limit = 5000
         no_viz = False
         obsidian_dir = Path(_GRAPHIFY_OUT) / "obsidian"
+        okf_dir = Path(_GRAPHIFY_OUT) / "okf"
         # Shared push-connection settings for the graph-database sinks (neo4j,
         # falkordb), parsed from the generic --push/--user/--password flags below.
         push_uri: str | None = None
@@ -3039,7 +3041,9 @@ def dispatch_command(cmd: str) -> None:
             elif a == "--no-viz":
                 no_viz = True; i += 1
             elif a == "--dir" and i + 1 < len(args):
-                obsidian_dir = Path(args[i + 1]); i += 2
+                obsidian_dir = Path(args[i + 1])
+                okf_dir = Path(args[i + 1])
+                i += 2
             elif a == "--push" and i + 1 < len(args):
                 push_uri = args[i + 1]; i += 2
             elif a == "--user" and i + 1 < len(args):
@@ -3241,6 +3245,13 @@ def dispatch_command(cmd: str) -> None:
             print(f"Canvas: {obsidian_dir}/graph.canvas")
             print(f"Open {obsidian_dir}/ as a vault in Obsidian.")
 
+        elif subcmd == "okf":
+            from graphify.export import to_okf as _to_okf
+            n = _to_okf(G, communities, str(okf_dir),
+                        community_labels=labels or None, cohesion=cohesion or None)
+            print(f"OKF bundle: {n} concepts in {okf_dir}/")
+            print(f"Index: {okf_dir}/okf.json")
+
         elif subcmd == "wiki":
             from graphify.wiki import to_wiki as _to_wiki
             from graphify.analyze import god_nodes as _god_nodes
@@ -3433,6 +3444,7 @@ def dispatch_command(cmd: str) -> None:
         global_merge = False
         code_only = False
         no_gitignore = False
+        extract_okf = False
         global_repo_tag: str | None = None
         # Performance/tuning knobs (issue #792). None means "use library default".
         cli_max_workers: int | None = None
@@ -3495,6 +3507,8 @@ def dispatch_command(cmd: str) -> None:
                 out_dir = Path(a.split("=", 1)[1]); i += 1
             elif a == "--no-cluster":
                 no_cluster = True; i += 1
+            elif a == "--okf":
+                extract_okf = True; i += 1
             elif a == "--dedup-llm":
                 dedup_llm = True; i += 1
             elif a == "--no-dedup":
@@ -3568,6 +3582,13 @@ def dispatch_command(cmd: str) -> None:
                 file=sys.stderr,
             )
             sys.exit(2)
+
+        if extract_okf:
+            from graphify.extractors.okf import extract_okf_bundle_to_graph
+            out_root = out_dir if out_dir is not None else Path(".")
+            out_file = out_root / _GRAPHIFY_OUT / "graph.json"
+            extract_okf_bundle_to_graph(target, out_file)
+            sys.exit(0)
 
         _VALID_MODES = {"deep"}
         if extract_mode is not None and extract_mode not in _VALID_MODES:

@@ -146,6 +146,31 @@ def test_export_obsidian_custom_dir(tmp_path):
     assert len(list(custom.glob("*.md"))) > 0
 
 
+# ── graphify export okf ──────────────────────────────────────────────────────
+
+def test_export_okf_creates_bundle(tmp_path):
+    _make_graph(tmp_path)
+    r = _run(["export", "okf"], tmp_path)
+    assert r.returncode == 0, r.stderr
+    okf_dir = tmp_path / "graphify-out" / "okf"
+    assert okf_dir.exists()
+    assert (okf_dir / "okf.json").exists()
+    md_files = list(okf_dir.glob("*.md"))
+    assert len(md_files) > 0
+
+
+def test_export_okf_custom_dir(tmp_path):
+    _make_graph(tmp_path)
+    custom = tmp_path / "my-okf-bundle"
+    r = _run(["export", "okf", "--dir", str(custom)], tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert custom.exists()
+    assert (custom / "okf.json").exists()
+    md_files = list(custom.glob("*.md"))
+    assert len(md_files) > 0
+
+
+
 # ── graphify export wiki ─────────────────────────────────────────────────────
 
 def test_export_wiki_creates_articles(tmp_path):

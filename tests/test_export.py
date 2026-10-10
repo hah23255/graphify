@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from graphify.build import build_from_json
 from graphify.cluster import cluster
-from graphify.export import to_json, to_cypher, to_graphml, to_html, to_canvas, to_obsidian
+from graphify.export import to_json, to_cypher, to_graphml, to_html, to_canvas, to_obsidian, to_okf
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -769,6 +769,46 @@ def test_to_obsidian_empty_dir_writes_full_vault():
         assert (out / "Database.md").exists() and (out / "Server.md").exists()
         assert (out / ".obsidian" / "graph.json").exists()
         assert n == 3  # 2 nodes + 1 community note
+
+
+def test_to_okf_empty_dir_writes_full_bundle():
+    """No regression: a fresh/empty dir gets every concept file + okf.json manifest."""
+    G, communities = _two_node_graph()
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "okf"
+        n = to_okf(G, communities, str(out), community_labels={0: "Backend"})
+        assert (out / "Database.md").exists() and (out / "Server.md").exists()
+        assert (out / "okf.json").exists()
+        assert n == 3  # 2 nodes + 1 community concept
+        
+        # Verify okf.json content
+        manifest = json.loads((out / "okf.json").read_text(encoding="utf-8"))
+        assert manifest["format"] == "okf-v0.1"
+        assert manifest["generator"] == "graphify"
+        assert len(manifest["concepts"]) == 3
+
+
+def test_to_okf_validates_markdown_frontmatter_and_manifest():
+    """Verify that concept files contain valid OKF YAML frontmatter and standard Markdown links (no wikilinks)."""
+    G, communities = _two_node_graph()
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "okf"
+        to_okf(G, communities, str(out), community_labels={0: "Backend"})
+        
+        # Verify Database.md content
+        db_content = (out / "Database.md").read_text(encoding="utf-8")
+        assert db_content.startswith("---")
+        assert 'type: "code"' in db_content
+        assert 'title: "Database"' in db_content
+        assert 'description: "Graphify concept' in db_content
+        assert 'resource: "app/db.py"' in db_content
+        assert 'tags:' in db_content
+        assert 'timestamp:' in db_content
+        
+        # Verify links are standard markdown relative links (not wikilinks)
+        assert "[Server](Server.md)" in db_content
+        assert "[[" not in db_content
+
 
 
 def test_to_obsidian_rerun_updates_own_notes_but_not_user_files():
