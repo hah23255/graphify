@@ -37,6 +37,23 @@ def _resolve_target(root: Path, src_file: Path, dest: str) -> str | None:
     return path
 
 
+def _split_frontmatter(text: str) -> tuple[str, str] | None:
+    """Split an OKF document into (frontmatter, body).
+
+    The block opens with a ``---`` line at the start of the file and closes at the
+    next line that is exactly ``---`` (OKF §4). A naive ``str.split("---")`` would
+    also cut at a ``---`` *inside* a value (e.g. a title containing ``--- text``),
+    truncating otherwise-valid frontmatter and dropping the concept on ingest.
+    """
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].strip() != "---":
+        return None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return "".join(lines[1:i]), "".join(lines[i + 1:])
+    return None
+
+
 def extract_okf_bundle_to_graph(bundle_dir: str | Path, output_graph_json: str | Path) -> None:
     """Ingest an OKF bundle directory and build a Graphify-compliant graph.json."""
     root = Path(bundle_dir)
@@ -58,11 +75,12 @@ def extract_okf_bundle_to_graph(bundle_dir: str | Path, output_graph_json: str |
     for file in concept_files:
         try:
             content = file.read_text(encoding="utf-8")
-            parts = content.split("---", 2)
-            if len(parts) < 3:
+            split = _split_frontmatter(content)
+            if split is None:
                 continue
+            fm_text, _body = split
 
-            frontmatter = yaml.safe_load(parts[1]) or {}
+            frontmatter = yaml.safe_load(fm_text) or {}
             label = frontmatter.get("title", file.stem)
             nid = file.stem.lower()
 
@@ -87,10 +105,10 @@ def extract_okf_bundle_to_graph(bundle_dir: str | Path, output_graph_json: str |
     for file in concept_files:
         try:
             content = file.read_text(encoding="utf-8")
-            parts = content.split("---", 2)
-            if len(parts) < 3:
+            split = _split_frontmatter(content)
+            if split is None:
                 continue
-            body = parts[2]
+            _fm_text, body = split
 
             src_id = path_to_node_id.get(_concept_id(root, file))
             if not src_id:

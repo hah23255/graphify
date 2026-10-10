@@ -43,3 +43,20 @@ def test_extract_okf_skips_reserved_filenames(tmp_path):
     graph = json.loads(out.read_text(encoding="utf-8"))
     assert {n["id"] for n in graph["nodes"]} == {"a"}
     assert graph["links"] == []
+
+
+def test_extract_okf_frontmatter_value_containing_dashes(tmp_path):
+    """A frontmatter value containing ``---`` must not truncate the block (OKF §4).
+
+    The block is delimited by ``---`` *lines*, so a naive ``split("---")`` wrongly
+    cuts inside a value and drops an otherwise-valid concept on ingest.
+    """
+    bundle = tmp_path / "bundle"
+    _write(bundle / "A.md", '---\ntype: rationale\ntitle: "A ```--- text``` line is skipped"\n---\n\nbody\n')
+    out = tmp_path / "out" / "graph.json"
+
+    extract_okf_bundle_to_graph(bundle, out)
+
+    graph = json.loads(out.read_text(encoding="utf-8"))
+    assert len(graph["nodes"]) == 1
+    assert graph["nodes"][0]["label"] == "A ```--- text``` line is skipped"
