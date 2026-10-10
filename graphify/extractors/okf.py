@@ -10,6 +10,7 @@ import json
 import posixpath
 import re
 from pathlib import Path
+from urllib.parse import unquote
 import yaml
 
 _RESERVED = {"index.md", "log.md"}
@@ -23,7 +24,7 @@ def _concept_id(root: Path, file: Path) -> str:
 
 def _resolve_target(root: Path, src_file: Path, dest: str) -> str | None:
     """Resolve an OKF markdown link target to a bundle-relative concept ID (§6.1)."""
-    dest = dest.split("?")[0].split("#")[0].strip()
+    dest = unquote(dest.split("?")[0].split("#")[0].strip())
     if not dest or dest.endswith("/"):
         return None
     if dest.startswith("/"):

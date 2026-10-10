@@ -787,6 +787,14 @@ def test_to_okf_empty_dir_writes_full_bundle():
         assert manifest["generator"] == "graphify"
         assert len(manifest["concepts"]) == 3
 
+        # OKF §8: a root index.md lists the concepts, with no frontmatter.
+        index = out / "index.md"
+        assert index.exists()
+        index_text = index.read_text(encoding="utf-8")
+        assert not index_text.startswith("---")
+        assert index_text.startswith("#")
+        assert "[Database](Database.md)" in index_text
+
 
 def test_to_okf_validates_markdown_frontmatter_and_manifest():
     """Verify that concept files contain valid OKF YAML frontmatter and standard Markdown links (no wikilinks)."""

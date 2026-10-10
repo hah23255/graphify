@@ -6,10 +6,17 @@ import hashlib
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote as _urlquote
 import networkx as nx
 
 from graphify.analyze import _node_community_map
 from graphify.build import edge_data
+
+
+def _md_href(name: str) -> str:
+    """Percent-encode a markdown link destination so paths with spaces stay valid."""
+    return _urlquote(str(name), safe="/")
+
 
 def _yaml_str(s: str) -> str:
     if s is None:
@@ -170,7 +177,7 @@ def to_okf(
                 neighbor_fname = node_filename[neighbor] + ".md"
                 relation = edata.get("relation", "")
                 confidence = edata.get("confidence", "EXTRACTED")
-                lines.append(f"- [{neighbor_label}]({neighbor_fname}) - `{relation}` [{confidence}]")
+                lines.append(f"- [{neighbor_label}]({_md_href(neighbor_fname)}) - `{relation}` [{confidence}]")
             lines.append("")
 
         fname = node_filename[node_id] + ".md"
@@ -242,7 +249,7 @@ def to_okf(
             node_fname = node_filename[node_id] + ".md"
             ftype = data.get("file_type", "")
             source = data.get("source_file", "")
-            entry = f"- [{node_label}]({node_fname})"
+            entry = f"- [{node_label}]({_md_href(node_fname)})"
             if ftype:
                 entry += f" - {ftype}"
             if source:
@@ -266,6 +273,21 @@ def to_okf(
         "concepts": concepts_manifest
     }
     _owned_write("okf.json", json.dumps(okf_manifest, indent=2))
+
+    # OKF §8 index.md — a directory listing for progressive disclosure (no frontmatter;
+    # concepts grouped under headings). This is the spec's index; okf.json stays as an
+    # extra machine-readable manifest (the spec tolerates additional files).
+    index_lines: list[str] = []
+    by_type: dict[str, list[dict]] = {}
+    for entry in concepts_manifest:
+        by_type.setdefault(str(entry.get("type") or "concept"), []).append(entry)
+    for type_name in sorted(by_type):
+        index_lines.append(f"# {type_name}")
+        index_lines.append("")
+        for entry in sorted(by_type[type_name], key=lambda e: str(e["title"]).lower()):
+            index_lines.append(f'* [{entry["title"]}]({_md_href(entry["file"])})')
+        index_lines.append("")
+    _owned_write("index.md", "\n".join(index_lines).rstrip() + "\n")
 
     try:
         _manifest_path.write_text(json.dumps({"files": sorted(set(_written))}, indent=2), encoding="utf-8")

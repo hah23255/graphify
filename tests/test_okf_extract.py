@@ -60,3 +60,17 @@ def test_extract_okf_frontmatter_value_containing_dashes(tmp_path):
     graph = json.loads(out.read_text(encoding="utf-8"))
     assert len(graph["nodes"]) == 1
     assert graph["nodes"][0]["label"] == "A ```--- text``` line is skipped"
+
+
+def test_extract_okf_resolves_percent_encoded_link(tmp_path):
+    """A filename with a space is percent-encoded in the link and must still resolve."""
+    bundle = tmp_path / "bundle"
+    _write(bundle / "A.md", '---\ntype: Metric\ntitle: "Alpha"\n---\n\nSee [Beta](tables/B%20one.md).\n')
+    _write(bundle / "tables" / "B one.md", '---\ntype: BigQuery Table\ntitle: "Beta one"\n---\n\nbody\n')
+    out = tmp_path / "out" / "graph.json"
+
+    extract_okf_bundle_to_graph(bundle, out)
+
+    graph = json.loads(out.read_text(encoding="utf-8"))
+    pairs = {(link["source"], link["target"]) for link in graph["links"]}
+    assert ("a", "b one") in pairs
